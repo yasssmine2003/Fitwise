@@ -1,9 +1,12 @@
 import React, { useState } from "react";
-import IndexNavbar from "../components/Navbars/IndexNavbar";
-import Footer from "../components/Footers/Footer";
 import { Link } from "react-router-dom";
 import well1 from "../assets/img/calm1.png";
 import well2 from "../assets/img/well2.png";
+import rain from "../assets/sounds/rain.mp3";
+import ocean from "../assets/sounds/ocean.mp3";
+import forest from "../assets/sounds/forest1.mp3";
+import whiteNoise from "../assets/sounds/med.mp3";
+
 
 // Nouvelle palette de couleurs vibrantes
 const vibrantColors = {
@@ -368,6 +371,40 @@ export default function BienEtre() {
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
   const [sleepNotes, setSleepNotes] = useState("");
   const [sleepQuality, setSleepQuality] = useState(8);
+  // --- juste au-dessus du return(), ajoute ce useRef ---
+  const sounds = [
+    { name: "Pluie douce", icon: "🌧️", color: "from-blue-400 to-blue-600", url: rain },
+    { name: "Océan calme", icon: "🌊", color: "from-cyan-400 to-cyan-600", url: ocean },
+    { name: "Forêt zen", icon: "🌲", color: "from-green-400 to-green-600", url: forest },
+    { name: "Bruit blanc", icon: "⚪", color: "from-gray-400 to-gray-600", url: whiteNoise }
+  ];
+  const audioRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (currentSound && isPlaying && audioRef.current) {
+      const soundObj = sounds.find(s => s.name === currentSound);
+      if (soundObj) {
+        audioRef.current.src = soundObj.url;
+        audioRef.current.play().catch(err => console.log("Lecture bloquée :", err));
+      }
+    } else if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  }, [currentSound, isPlaying]);
+    
+
+
+
+
+
+
+
+
+
+
+
+
 
   // Timer pour les exercices de respiration
   React.useEffect(() => {
@@ -968,64 +1005,184 @@ export default function BienEtre() {
               </div>
 
               {/* Ambiances sonores */}
-              <div>
-                <h3 className="text-3xl font-display text-purple mb-8 text-center tracking-wide">Ambiances sonores</h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  {[
-                    { name: "Pluie douce", icon: "🌧️", color: "from-blue-400 to-blue-600", url: "https://www.soundjay.com/misc/sounds/rain-01.mp3" },
-                    { name: "Océan calme", icon: "🌊", color: "from-cyan-400 to-cyan-600", url: "https://www.soundjay.com/misc/sounds/ocean-wave-1.mp3" },
-                    { name: "Forêt zen", icon: "🌲", color: "from-green-400 to-green-600", url: "https://www.soundjay.com/misc/sounds/forest-ambience.mp3" },
-                    { name: "Bruit blanc", icon: "⚪", color: "from-gray-400 to-gray-600", url: "https://www.soundjay.com/misc/sounds/white-noise.mp3" }
-                  ].map((sound, index) => (
-                    <ZenCard key={index} className="text-center p-6">
-                      <span className="text-4xl mb-4 block group-hover:scale-110 transition-all duration-300">{sound.icon}</span>
-                      <h4 className="text-lg font-display text-purple mb-3">{sound.name}</h4>
-                      <ZenButton
-                        onClick={() => {
-                          if (currentSound === sound.name && isPlaying) {
-                            setIsPlaying(false);
-                            setCurrentSound(null);
-                          } else {
-                            setCurrentSound(sound.name);
-                            setIsPlaying(true);
-                          }
-                        }}
-                        className={`${sound.color} ${
-                          currentSound === sound.name && isPlaying ? 'ring-4 ring-white/50 animate-pulse' : ''
-                        }`}
-                      >
-                        {currentSound === sound.name && isPlaying ? 'Arrêter' : 'Écouter'}
-                      </ZenButton>
-                      
-                      {/* Audio element (caché) */}
-                      {currentSound === sound.name && (
-                        <audio 
-                          src={sound.url} 
-                          autoPlay={isPlaying}
-                          loop
-                          onEnded={() => setIsPlaying(false)}
-                          style={{ display: 'none' }}
-                        />
-                      )}
-                    </ZenCard>
-                  ))}
-                </div>
-                
-                {/* Indicateur de lecture moderne */}
-                {isPlaying && (
-                  <div className="mt-8 text-center">
-                    <div className="inline-flex items-center gap-4 bg-white/60 backdrop-blur-sm rounded-full px-8 py-4 border border-cream">
-                      <span className="text-2xl">🎵</span>
-                      <span className="text-gray-700 font-body">Écoute en cours : {currentSound}</span>
-                      <div className="flex space-x-2">
-                        <div className="w-2 h-2 bg-green rounded-full animate-pulse"></div>
-                        <div className="w-2 h-2 bg-green rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
-                        <div className="w-2 h-2 bg-green rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+<div>
+  <h3 className="text-3xl font-display text-purple mb-8 text-center tracking-wide">
+    Ambiances sonores
+  </h3>
+  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+    {sounds.map((sound, index) => (
+      <ZenCard key={index} className="text-center p-6">
+        <span className="text-4xl mb-4 block group-hover:scale-110 transition-all duration-300">
+          {sound.icon}
+        </span>
+        <h4 className="text-lg font-display text-purple mb-3">{sound.name}</h4>
+        <ZenButton
+          onClick={() => {
+            if (currentSound === sound.name && isPlaying) {
+              setIsPlaying(false);
+              setCurrentSound(null);
+            } else {
+              setCurrentSound(sound.name);
+              setIsPlaying(true);
+            }
+          }}
+          className={`${sound.color} ${
+            currentSound === sound.name && isPlaying
+              ? "ring-4 ring-white/50 animate-pulse"
+              : ""
+          }`}
+        >
+          {currentSound === sound.name && isPlaying ? "Arrêter" : "Écouter"}
+        </ZenButton>
+      </ZenCard>
+    ))}
+  </div>
+
+  {/* Élément audio caché */}
+  <audio ref={audioRef} loop style={{ display: "none" }} />
+
+  {/* Indicateur de lecture moderne */}
+  {isPlaying && (
+    <div className="mt-8 text-center">
+      <div className="inline-flex items-center gap-4 bg-white/60 backdrop-blur-sm rounded-full px-8 py-4 border border-cream">
+        <span className="text-2xl">🎵</span>
+        <span className="text-gray-700 font-body">
+          Écoute en cours : {currentSound}
+        </span>
+        <div className="flex space-x-2">
+          <div className="w-2 h-2 bg-green rounded-full animate-pulse"></div>
+          <div
+            className="w-2 h-2 bg-green rounded-full animate-pulse"
+            style={{ animationDelay: "0.2s" }}
+          ></div>
+          <div
+            className="w-2 h-2 bg-green rounded-full animate-pulse"
+            style={{ animationDelay: "0.4s" }}
+          ></div>
+        </div>
+      </div>
+    </div>
+  )}
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
             </div>
           </div>
         </section>
