@@ -727,37 +727,6 @@ export default function BienEtre() {
                     </ZenCard>
                   )}
                 </div>
-
-                {/* Graphique de suivi */}
-                <div>
-                  <h3 className="text-2xl font-display text-purple mb-8 tracking-wide">Votre progression</h3>
-                  <ZenCard className="p-8 h-full flex flex-col justify-center">
-                    <div className="text-center">
-                      <div className="w-full h-64 bg-white/50 rounded-xl mb-6 flex items-end justify-center p-4">
-                        {/* Barres du graphique */}
-                        {Object.entries(answers)
-                          .slice(-7)
-                          .map(([date, data], i) => (
-                            <div key={date} className="flex flex-col items-center mx-1">
-                              <div 
-                                className="w-8 bg-gradient-to-t from-green to-purple rounded-t-sm transition-all duration-500"
-                                style={{ height: `${(data.score / 20) * 100}%` }}
-                              />
-                              <span className="text-xs text-gray-500 mt-1">
-                                {new Date(date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-                              </span>
-                            </div>
-                          ))}
-                      </div>
-                      <p className="text-gray-600 font-body mb-6">
-                        Suivez votre évolution sur les 7 derniers jours
-                      </p>
-                      <ZenButton type="secondary">
-                        Voir l'historique complet
-                      </ZenButton>
-                    </div>
-                  </ZenCard>
-                </div>
               </div>
             </ZenCard>
           </div>
@@ -880,7 +849,7 @@ export default function BienEtre() {
                 ].map((stat, i) => (
                   <ZenCard key={i} className="text-center p-6">
                     <div className="text-3xl mb-2">{stat.icon}</div>
-                    <div className="text-2xl font-display text-green">{stat.value}</div>
+                    <div className="text-2xl font-display text-black">{stat.value}</div>
                     <div className="text-sm text-gray-600 font-body">{stat.label}</div>
                   </ZenCard>
                 ))}
@@ -976,7 +945,7 @@ export default function BienEtre() {
                         
                         {/* Bénéfice avec design moderne */}
                         <div className="bg-gradient-to-r from-green/10 to-greenLight/10 rounded-xl p-4 border border-green/20">
-                          <div className="text-sm text-green font-medium mb-2 flex items-center gap-2 font-body">
+                          <div className="text-sm text-purple font-medium mb-2 flex items-center gap-2 font-body">
                             <span>💡</span>
                             Bénéfice
                           </div>
