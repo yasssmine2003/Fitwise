@@ -1,7 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState} from "react";
 import { Link, useLocation } from "react-router-dom";
-import Footer from "components/Footers/Footer.js";
-
 export default function Navbar({ scrolled, customBg }) {
   const [menuOpen, setMenuOpen] = useState(false);
 

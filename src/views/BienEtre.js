@@ -132,39 +132,22 @@ const breathingExercises = [
   }
 ];
 
-// Conseils pour le sommeil
-const sleepTips = [
-  {
-    title: "Rituel du soir",
-    tips: [
-      "Évitez les écrans 1h avant le coucher",
-      "Prenez une tisane apaisante (camomille, tilleul)",
-      "Lisez un livre relaxant",
-      "Faites quelques étirements doux",
-      "Méditez 10 minutes"
-    ]
-  },
-  {
-    title: "Environnement optimal",
-    tips: [
-      "Température entre 18-20°C",
-      "Chambre dans l'obscurité totale",
-      "Bruit blanc ou silence complet",
-      "Literie confortable et propre",
-      "Aérez la chambre 10 minutes"
-    ]
-  },
-  {
-    title: "Alimentation",
-    tips: [
-      "Dînez léger 2h avant le coucher",
-      "Évitez café, thé, alcool",
-      "Privilégiez les protéines et glucides complexes",
-      "Buvez suffisamment d'eau",
-      "Évitez les repas trop copieux"
-    ]
-  }
-];
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // Routines de relaxation
 const relaxationRoutines = [
@@ -198,25 +181,6 @@ const relaxationRoutines = [
       "Méditation du soir",
       "Préparation du lendemain"
     ]
-  }
-];
-
-// Playlists de sons apaisants
-const soothingPlaylists = [
-  {
-    name: "Nature apaisante",
-    tracks: ["Pluie douce", "Océan calme", "Forêt zen", "Ruisseau", "Oiseaux matinaux"],
-    duration: 60
-  },
-  {
-    name: "Méditation guidée",
-    tracks: ["Respiration consciente", "Body scan", "Loving-kindness", "Mindfulness", "Gratitude"],
-    duration: 45
-  },
-  {
-    name: "Sons binauraux",
-    tracks: ["Alpha waves", "Theta waves", "Delta waves", "Gamma waves", "Beta waves"],
-    duration: 30
   }
 ];
 
@@ -273,9 +237,6 @@ const SectionHeader = ({ icon, title, subtitle }) => {
 
 export default function BienEtre() {
   const [currentQuote, setCurrentQuote] = useState(0);
-  const [activeExercise, setActiveExercise] = useState(null);
-  const [email, setEmail] = useState("");
-  const [subscribed, setSubscribed] = useState(false);
   const [activeSection, setActiveSection] = useState("hero");
 
   // Changement automatique des citations
@@ -285,15 +246,6 @@ export default function BienEtre() {
     }, 5000);
     return () => clearInterval(interval);
   }, []);
-
-  const handleSubscribe = (e) => {
-    e.preventDefault();
-    if (email) {
-      setSubscribed(true);
-      setEmail("");
-      setTimeout(() => setSubscribed(false), 3000);
-    }
-  };
 
   // --- Questionnaire bien-être ---
   const today = new Date().toISOString().slice(0, 10);
@@ -359,12 +311,6 @@ export default function BienEtre() {
   const [activeBreathing, setActiveBreathing] = useState(null);
   const [breathingTimer, setBreathingTimer] = useState(0);
   const [isBreathing, setIsBreathing] = useState(false);
-  const [selectedRoutine, setSelectedRoutine] = useState(null);
-  const [sleepData, setSleepData] = useState(() => {
-    const saved = localStorage.getItem('bienetreSleep');
-    return saved ? JSON.parse(saved) : {};
-  });
-  const [currentPlaylist, setCurrentPlaylist] = useState(null);
   const [currentSound, setCurrentSound] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [completedSteps, setCompletedSteps] = useState({});
@@ -372,13 +318,15 @@ export default function BienEtre() {
   const [sleepNotes, setSleepNotes] = useState("");
   const [sleepQuality, setSleepQuality] = useState(8);
   // --- juste au-dessus du return(), ajoute ce useRef ---
-  const sounds = [
+  const sounds = React.useMemo(() => [
     { name: "Pluie douce", icon: "🌧️", color: "from-blue-400 to-blue-600", url: rain },
     { name: "Océan calme", icon: "🌊", color: "from-cyan-400 to-cyan-600", url: ocean },
     { name: "Forêt zen", icon: "🌲", color: "from-green-400 to-green-600", url: forest },
     { name: "Bruit blanc", icon: "⚪", color: "from-gray-400 to-gray-600", url: whiteNoise }
-  ];
+  ], []);
+  
   const audioRef = React.useRef(null);
+// eslint-disable-next-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
     if (currentSound && isPlaying && audioRef.current) {
@@ -391,7 +339,7 @@ export default function BienEtre() {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
-  }, [currentSound, isPlaying]);
+  }, [currentSound, isPlaying,sounds]);
     
 
 
@@ -428,12 +376,6 @@ export default function BienEtre() {
     setActiveBreathing(exercise);
     setBreathingTimer(exercise.duration * 60);
     setIsBreathing(true);
-  };
-
-  const saveSleepData = (data) => {
-    const newSleepData = { ...sleepData, [today]: data };
-    setSleepData(newSleepData);
-    localStorage.setItem('bienetreSleep', JSON.stringify(newSleepData));
   };
 
   const scrollToSection = (sectionId) => {

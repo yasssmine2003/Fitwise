@@ -134,8 +134,8 @@ const ActivitePhysique = () => {
     const loadData = () => {
       try {
         const savedActivites = safelyParse(localStorage.getItem('fitwiseActivites'), []);
-        const savedObjectifs = safelyParse(localStorage.getItem('fitwiseObjectifs'), objectifs);
-        const savedProfile = safelyParse(localStorage.getItem('fitwiseProfile'), userProfile);
+        const savedObjectifs = safelyParse(localStorage.getItem('fitwiseObjectifs'),[]);
+        const savedProfile = safelyParse(localStorage.getItem('fitwiseProfile'),{});
         const savedTheme = safelyParse(localStorage.getItem('fitwiseDarkMode'), false);
         const savedSeances = safelyParse(localStorage.getItem('fitwiseSeancesPlanifiees'), []);
 
@@ -154,7 +154,7 @@ const ActivitePhysique = () => {
     };
 
     loadData();
-  }, []);
+      }, []);
 
 
   // Fonctions de calcul
@@ -338,34 +338,6 @@ const ActivitePhysique = () => {
     
     alert('Séance convertie en activité !');
   };
-
-  // Génération des données pour les graphiques
-  const genererDonneesHebdo = useMemo(() => {
-    const jours = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
-    const aujourdHui = new Date();
-    const dateDebut = new Date();
-    dateDebut.setDate(aujourdHui.getDate() - 6);
-
-    const donnees = {};
-    jours.forEach(jour => {
-      donnees[jour] = 0;
-    });
-
-    activites.forEach(act => {
-      try {
-        const dateAct = new Date(act.date);
-        if (dateAct >= dateDebut && dateAct <= aujourdHui) {
-          const jourSemaine = jours[dateAct.getDay() === 0 ? 6 : dateAct.getDay() - 1];
-          donnees[jourSemaine] += parseInt(act.duree) || 0;
-        }
-      } catch {
-        // Ignorer les dates invalides
-      }
-    });
-
-    return donnees;
-  }, [activites]);
-
   const pieData = useMemo(() => {
     return Object.entries(statistiques.typesActivites || {}).map(([type, count]) => [type, count]);
   }, [statistiques.typesActivites]);
@@ -539,12 +511,8 @@ const ActivitePhysique = () => {
     const nutritionProfile = localStorage.getItem('nutritionProfile');
     
     if (!nutritionData || !nutritionProfile) return null;
-    
-    const data = JSON.parse(nutritionData);
     const profile = JSON.parse(nutritionProfile);
     const today = new Date().toISOString().slice(0, 10);
-    const todayData = data[today] || { meals: {} };
-
     const activitesAujourdhui = activites.filter(act => {
       const actDate = new Date(act.date).toISOString().slice(0, 10);
       return actDate === today;
@@ -581,8 +549,8 @@ const ActivitePhysique = () => {
       };
     }
     
-    const { todayData, profile } = nutritionInfo;
-    const { besoinsTotaux, caloriesBrulées } = besoins;
+    const { todayData } = nutritionInfo;
+    const { besoinsTotaux } = besoins;
     
     const caloriesConsommees = todayData ? 
       Object.values(todayData.meals || {}).flat().reduce((sum, food) => sum + (Number(food.calories) || 0), 0) : 0;

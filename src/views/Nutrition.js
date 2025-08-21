@@ -279,7 +279,7 @@ export default function Nutrition() {
     if (profile && !data[today]) {
       setData(d => ({ ...d, [today]: { meals: { breakfast: [], lunch: [], dinner: [], snack: [] }, water: 0 } }));
     }
-  }, [profile, today]);
+  }, [profile, today,data]);
 
   useEffect(() => {
     localStorage.setItem("nutritionProfile", JSON.stringify(profile));
@@ -398,11 +398,9 @@ export default function Nutrition() {
       };
     }
     
-    const { activitesAujourdhui, objectifs } = activiteInfo;
+    const { activitesAujourdhui} = activiteInfo;
     const caloriesConsommees = allFoods.reduce((sum, f) => sum + (Number(f.calories) || 0), 0);
-    const caloriesBrulées = activitesAujourdhui.reduce((sum, act) => sum + (parseInt(act.calories) || 0), 0);
-    const dureeTotale = activitesAujourdhui.reduce((sum, act) => sum + (parseInt(act.duree) || 0), 0);
-    
+    const caloriesBrulées = activitesAujourdhui.reduce((sum, act) => sum + (parseInt(act.calories) || 0), 0);    
     // Calculer le surplus/déficit calorique (en tenant compte des calories brûlées)
     const surplus = caloriesConsommees - (calorieGoal + caloriesBrulées);
     
@@ -825,7 +823,7 @@ export default function Nutrition() {
               </div>
             )}
             
-            {dayData.water * 250 == 1750 && (
+            {dayData.water * 250 === 1750 && (
               <div className="flex items-center justify-center mb-4 animate-bounce">
                 <span className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-400 to-emerald-400 text-white font-bold px-4 py-2 rounded-full shadow-lg border-2 border-blue-300">
                   Encore 250ml pour atteindre ton objectif !
