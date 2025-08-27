@@ -8,6 +8,7 @@
     "@fortawesome/fontawesome-free": "5.15.3",
     "@popperjs/core": "2.9.1",
     "@tailwindcss/forms": "0.2.1",
+    "axios": "^1.11.0",
     "chart.js": "^3.9.1",
     "date-fns": "^2.30.0",
     "get-user-locale": "^3.0.0",

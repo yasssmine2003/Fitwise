@@ -18,6 +18,7 @@ import Index from "views/Index.js";
 import Nutrition from "views/Nutrition.js";
 import ActivitePhysique from 'views/ActivitePhysique';
 import BienEtre from 'views/BienEtre';
+import Dashboard from "views/admin/Dashboard";
 
 ReactDOM.render(
   <BrowserRouter>
@@ -31,6 +32,7 @@ ReactDOM.render(
       <Route path="/nutrition" exact component={Nutrition} />
       <Route path="/activite-physique" exact  component={ActivitePhysique} />
       <Route path="/bien-etre" exact  component={BienEtre } />
+      <Route path='/dashboard' ecact component={Dashboard} />
       <Route path="/" exact component={Index} />
       {/* add redirect for first page */}
       <Redirect from="*" to="/" />
