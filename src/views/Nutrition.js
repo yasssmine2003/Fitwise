@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { fr } from 'date-fns/locale';
+import { Link, Redirect } from "react-router-dom";
 import back from 'assets/img/back.jpg';
-import { Link } from "react-router-dom"
+import api from "../api";
+import { getNutrition, addNutrition } from "../services/nutritionService";
+
 // Fonction utilitaire pour manipuler les dates
 const addDays = (date, days) => {
   if (!date || !(date instanceof Date)) {
@@ -251,138 +254,295 @@ function EditFoodForm({ food, onSave, onCancel }) {
     </form>
   );
 }
-/* les donnes sont stockes dans le local storage , a modifier pour que les donnes soient stockes dans la base de donnes  plus tard !!!*/
 
 export default function Nutrition() {
+  // États pour la version API
+  const [nutritionData, setNutritionData] = useState([]);
   const [profile, setProfile] = useState(() => {
     const saved = localStorage.getItem("nutritionProfile");
     return saved ? JSON.parse(saved) : null;
   });
-  
-  const [data, setData] = useState(() => {
-    const saved = localStorage.getItem("nutritionData");
-    return saved ? JSON.parse(saved) : {};
-  });
-  
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const today = new Date();
-    console.log('Date sélectionnée initialisée:', today);
-    return today;
-  });
+  const [today] = useState(new Date().toISOString().slice(0, 10)); // YYYY-MM-DD
+  const [todayData, setTodayData] = useState({ meals: { breakfast: [], lunch: [], dinner: [], snack: [] }, water: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [redirectToLogin, setRedirectToLogin] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [editing, setEditing] = useState(null);
-  
-  // Calculer today à partir de selectedDate
-  const today = format(selectedDate, "yyyy-MM-dd");
+  const [selectedDate, setSelectedDate] = useState(new Date());
 
+  // Charger les données depuis l'API
   useEffect(() => {
-    if (profile && !data[today]) {
-      setData(d => ({ ...d, [today]: { meals: { breakfast: [], lunch: [], dinner: [], snack: [] }, water: 0 } }));
+    const userId = localStorage.getItem("userId");
+    if (!userId) {
+      // Mode hors ligne - utiliser localStorage
+      const savedData = localStorage.getItem("nutritionData");
+      if (savedData) {
+        const parsedData = JSON.parse(savedData);
+        const todayFormatted = format(selectedDate, "yyyy-MM-dd");
+        setTodayData(parsedData[todayFormatted] || { meals: { breakfast: [], lunch: [], dinner: [], snack: [] }, water: 0 });
+      }
+      setLoading(false);
+      return;
     }
-  }, [profile, today,data]);
 
-  useEffect(() => {
-    localStorage.setItem("nutritionProfile", JSON.stringify(profile));
-  }, [profile]);
-  
-  useEffect(() => {
-    localStorage.setItem("nutritionData", JSON.stringify(data));
-  }, [data]);
+    const fetchData = async () => {
+      try {
+        const [nutritionResponse, userResponse] = await Promise.all([
+          getNutrition(userId),
+          api.get(`/users/${userId}`),
+        ]);
+        const logs = nutritionResponse.data || [];
+        setNutritionData(logs);
 
-  // Effet pour surveiller les changements de date
+        // trouver le log du jour (format date attendu YYYY-MM-DD dans log.date)
+        const todayLog = logs.find((log) => (log.date || "").slice(0, 10) === today) || { meals: { breakfast: [], lunch: [], dinner: [], snack: [] }, water: 0 };
+        setTodayData(todayLog);
+
+        if (userResponse.data.profilNutrition) {
+          setProfile(userResponse.data.profilNutrition);
+        }
+      } catch (err) {
+        // En cas d'erreur, utiliser les données locales
+        const savedData = localStorage.getItem("nutritionData");
+        if (savedData) {
+          const parsedData = JSON.parse(savedData);
+          const todayFormatted = format(selectedDate, "yyyy-MM-dd");
+          setTodayData(parsedData[todayFormatted] || { meals: { breakfast: [], lunch: [], dinner: [], snack: [] }, water: 0 });
+        }
+        setError(err.response?.data?.message || "Erreur lors du chargement des données. Mode hors ligne activé.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [today, selectedDate]);
+
+  // Rediriger après création réussie du profil
   useEffect(() => {
-    console.log('Date sélectionnée changée:', selectedDate);
-    console.log('Date formatée (today):', today);
+    if (success && profile) {
+      const timer = setTimeout(() => {
+        // Recharger les données après création du profil
+        const userId = localStorage.getItem("userId");
+        if (userId) {
+          getNutrition(userId).then(response => {
+            const logs = response.data || [];
+            const todayLog = logs.find((log) => (log.date || "").slice(0, 10) === today) || { meals: { breakfast: [], lunch: [], dinner: [], snack: [] }, water: 0 };
+            setTodayData(todayLog);
+            setNutritionData(logs);
+          });
+        }
+      }, 2000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [success, profile, today]);
+
+  // Sauvegarder la journée (water + modifications)
+  const saveDayData = async (updatedDay) => {
+    const userId = localStorage.getItem("userId");
+    if (!userId) {
+      // Mode hors ligne - sauvegarder dans localStorage
+      const savedData = localStorage.getItem("nutritionData") || "{}";
+      const parsedData = JSON.parse(savedData);
+      const todayFormatted = format(selectedDate, "yyyy-MM-dd");
+      
+      parsedData[todayFormatted] = updatedDay;
+      localStorage.setItem("nutritionData", JSON.stringify(parsedData));
+      setTodayData(updatedDay);
+      return;
+    }
+
+    try {
+      const payload = { ...updatedDay, userId, date: today };
+      const response = await addNutrition(payload);
+      setNutritionData([
+        ...nutritionData.filter((log) => (log.date || '').slice(0, 10) !== today),
+        response.data,
+      ]);
+      setTodayData(response.data);
+    } catch (err) {
+      setError(err.response?.data?.message || "Erreur lors de la mise à jour.");
+    }
+  };
+
+  // Gestion de l'eau
+  const handleAddWater = () => {
+    const newWater = Math.min((todayData.water || 0) + 1, 8);
+    const updatedDay = { ...todayData, water: newWater };
+    saveDayData(updatedDay);
+  };
+
+  const handleRemoveWater = () => {
+    const newWater = Math.max((todayData.water || 0) - 1, 0);
+    const updatedDay = { ...todayData, water: newWater };
+    saveDayData(updatedDay);
+  };
+
+  // Ajouter un aliment
+  const handleAddFood = async (mealId, food) => {
+    setError("");
+    setSuccess("");
+    const userId = localStorage.getItem("userId");
     
-    // S'assurer que les données existent pour la nouvelle date
-    if (profile && !data[today]) {
-      console.log('Initialisation des données pour:', today);
-      setData(d => ({ 
-        ...d, 
-        [today]: { 
-          meals: { breakfast: [], lunch: [], dinner: [], snack: [] }, 
-          water: 0 
-        } 
-      }));
+    // Préparer les données mises à jour
+    const updatedMeals = {
+      ...todayData.meals,
+      [mealId]: [...(todayData.meals[mealId] || []), food]
+    };
+    const updatedDay = { ...todayData, meals: updatedMeals };
+    
+    if (!userId) {
+      // Mode hors ligne - sauvegarder dans localStorage
+      const savedData = localStorage.getItem("nutritionData") || "{}";
+      const parsedData = JSON.parse(savedData);
+      const todayFormatted = format(selectedDate, "yyyy-MM-dd");
+      
+      parsedData[todayFormatted] = updatedDay;
+      localStorage.setItem("nutritionData", JSON.stringify(parsedData));
+      setTodayData(updatedDay);
+      setSuccess("Repas ajouté avec succès ! (mode hors ligne)");
+      return;
     }
-  }, [selectedDate, today, profile, data]);
 
-  const calorieGoal = profile ? calculateCalories(profile) : 2000;
-  const macrosGoal = calculateMacros(calorieGoal);
-  const dayData = data[today] || { meals: { breakfast: [], lunch: [], dinner: [], snack: [] }, water: 0 };
-  const allFoods = Object.values(dayData.meals).flat();
-  const totalCalories = allFoods.reduce((sum, f) => sum + (Number(f.calories) || 0), 0);
-  const totalCarbs = allFoods.reduce((sum, f) => sum + (Number(f.carbs) || 0), 0);
-  const totalProtein = allFoods.reduce((sum, f) => sum + (Number(f.protein) || 0), 0);
-  const totalFat = allFoods.reduce((sum, f) => sum + (Number(f.fat) || 0), 0);
+    try {
+      // Structure attendue : { userId, date, meals: {...}, water }
+      const payload = {
+        userId,
+        date: today,
+        meals: updatedMeals,
+        water: todayData.water || 0,
+      };
 
-  const handleAddWater = () => setData(d => ({ ...d, [today]: { ...dayData, water: Math.min(dayData.water + 1, 8) } }));
-  const handleRemoveWater = () => setData(d => ({ ...d, [today]: { ...dayData, water: Math.max(dayData.water - 1, 0) } }));
-
-  const handleAddFood = (meal, food) => {
-    setData(d => ({
-      ...d,
-      [today]: {
-        ...dayData,
-        meals: {
-          ...dayData.meals,
-          [meal]: [...dayData.meals[meal], food],
-        },
-      },
-    }));
+      const response = await addNutrition(payload);
+      setNutritionData([
+        ...nutritionData.filter((log) => (log.date || "").slice(0, 10) !== today),
+        response.data,
+      ]);
+      setTodayData(response.data);
+      setSuccess("Repas ajouté avec succès !");
+    } catch (err) {
+      setError(err.response?.data?.message || "Erreur lors de l'ajout du repas.");
+    }
   };
 
+  // Supprimer un aliment
   const handleDeleteFood = (meal, idx) => {
-    setData(d => ({
-      ...d,
-      [today]: {
-        ...dayData,
-        meals: {
-          ...dayData.meals,
-          [meal]: dayData.meals[meal].filter((_, i) => i !== idx),
-        },
-      },
-    }));
+    const updatedMeals = {
+      ...todayData.meals,
+      [meal]: todayData.meals[meal].filter((_, i) => i !== idx),
+    };
+    const updatedDay = { ...todayData, meals: updatedMeals };
+    saveDayData(updatedDay);
   };
 
+  // Modifier un aliment
   const handleEditFood = (meal, idx, newFood) => {
-    setData(d => ({
-      ...d,
-      [today]: {
-        ...dayData,
-        meals: {
-          ...dayData.meals,
-          [meal]: dayData.meals[meal].map((f, i) => i === idx ? newFood : f),
-        },
-      },
-    }));
+    const updatedMeals = {
+      ...todayData.meals,
+      [meal]: todayData.meals[meal].map((f, i) => i === idx ? newFood : f),
+    };
+    const updatedDay = { ...todayData, meals: updatedMeals };
+    saveDayData(updatedDay);
     setEditing(null);
   };
 
-  const handleReset = () => {
-    localStorage.removeItem("nutritionProfile");
-    localStorage.removeItem("nutritionData");
-    setProfile(null);
-    setData({});
-    setShowProfileModal(false);
+  // Mettre à jour le profil
+  const handleProfileSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+    const userId = localStorage.getItem("userId");
+    
+    const formData = new FormData(e.target);
+    const updatedProfile = {
+      age: Number(formData.get("age")),
+      poidsKg: Number(formData.get("weight")),
+      tailleCm: Number(formData.get("height")),
+      sexe: formData.get("sex"),
+      niveauActivite: formData.get("activity"),
+      objectif: formData.get("goal"),
+    };
+
+    if (!userId) {
+      // Mode hors ligne - sauvegarder dans localStorage
+      localStorage.setItem("nutritionProfile", JSON.stringify(updatedProfile));
+      localStorage.setItem("nutritionData", JSON.stringify({}));
+      setProfile(updatedProfile);
+      setSuccess("Profil créé avec succès ! (mode hors ligne)");
+      setShowProfileModal(false);
+      return;
+    }
+
+    try {
+      // Essayer d'abord avec l'API
+      const response = await api.put(`/users/${userId}`, {
+        profilNutrition: updatedProfile
+      });
+      
+      setProfile(updatedProfile);
+      setSuccess("Profil nutritionnel créé avec succès !");
+      setShowProfileModal(false);
+
+      // Créer une entrée nutrition
+      try {
+        const todayNutritionData = {
+          userId,
+          date: today,
+          meals: { breakfast: [], lunch: [], dinner: [], snack: [] },
+          water: 0
+        };
+        await addNutrition(todayNutritionData);
+      } catch (nutritionError) {
+        console.warn("⚠️ Erreur création nutrition:", nutritionError);
+      }
+      
+    } catch (err) {
+      setError(err.response?.data?.message || "Erreur lors de la mise à jour du profil.");
+    }
   };
+
+  // Redirection si non connecté + loader
+  if (redirectToLogin) return <Redirect to="/auth/login" replace />;
+  if (loading) return <div className="text-center py-10">Chargement...</div>;
+
+  // Calcul des totaux/macros
+  const allFoods = Object.values(todayData.meals || {}).flat();
+  const totalCalories = allFoods.reduce((s, f) => s + (Number(f.calories) || 0), 0);
+  const totalCarbs = allFoods.reduce((s, f) => s + (Number(f.carbs) || 0), 0);
+  const totalProtein = allFoods.reduce((s, f) => s + (Number(f.protein) || 0), 0);
+  const totalFat = allFoods.reduce((s, f) => s + (Number(f.fat) || 0), 0);
+
+  // objectif macros (si ton profil contient besoin calorique, sinon 2000)
+  const calorieGoal = profile ? calculateCalories({
+    weight: profile.poidsKg || profile.weight,
+    height: profile.tailleCm || profile.height,
+    age: profile.age,
+    sex: profile.sexe || profile.sex,
+    activity: profile.niveauActivite || profile.activity,
+    goal: profile.objectif || profile.goal
+  }) : 2000;
+
+  const macrosGoal = calculateMacros(calorieGoal);
 
   // Fonction pour récupérer les données d'activité physique
   const getActiviteData = () => {
     const activitesData = localStorage.getItem('fitwiseActivites');
     const objectifsData = localStorage.getItem('fitwiseObjectifs');
-    
+
     if (!activitesData) return null;
-    
+
     const activites = JSON.parse(activitesData);
     const objectifs = objectifsData ? JSON.parse(objectifsData) : null;
     const today = new Date().toISOString().slice(0, 10);
-    
+
     const activitesAujourdhui = activites.filter(act => {
       const actDate = new Date(act.date).toISOString().slice(0, 10);
       return actDate === today;
     });
-    
+
     return { activites, activitesAujourdhui, objectifs, today };
   };
 
@@ -397,13 +557,13 @@ export default function Nutrition() {
         tags: ["🏃‍♀️ Activité", "🔗 Connexion", "📊 Données"]
       };
     }
-    
-    const { activitesAujourdhui} = activiteInfo;
+
+    const { activitesAujourdhui } = activiteInfo;
     const caloriesConsommees = allFoods.reduce((sum, f) => sum + (Number(f.calories) || 0), 0);
-    const caloriesBrulées = activitesAujourdhui.reduce((sum, act) => sum + (parseInt(act.calories) || 0), 0);    
+    const caloriesBrulées = activitesAujourdhui.reduce((sum, act) => sum + (parseInt(act.calories) || 0), 0);
     // Calculer le surplus/déficit calorique (en tenant compte des calories brûlées)
     const surplus = caloriesConsommees - (calorieGoal + caloriesBrulées);
-    
+
     // Recommandations selon le contexte
     if (activitesAujourdhui.length === 0) {
       if (surplus > 200) {
@@ -414,7 +574,7 @@ export default function Nutrition() {
           tags: ["🏃‍♀️ Activité", "⚖️ Équilibre", "🔥 Calories"]
         };
       }
-      
+
       return {
         titre: "Bonne alimentation !",
         conseil: "Votre alimentation est équilibrée. Une activité physique vous aiderait à optimiser votre santé !",
@@ -422,7 +582,7 @@ export default function Nutrition() {
         tags: ["🍎 Nutrition", "💪 Santé", "🌟 Bien-être"]
       };
     }
-    
+
     if (surplus > 300) {
       return {
         titre: "Intensifiez votre activité !",
@@ -431,7 +591,7 @@ export default function Nutrition() {
         tags: ["⚡ Intensité", "⏰ Durée", "🔥 Calories"]
       };
     }
-    
+
     if (surplus < -200) {
       return {
         titre: "Attention à la récupération !",
@@ -440,11 +600,11 @@ export default function Nutrition() {
         tags: ["🧘 Récupération", "🍽️ Alimentation", "💤 Repos"]
       };
     }
-    
+
     // Recommandations selon les macronutriments
     const ratioProteines = (totalProtein / (totalProtein + totalCarbs + totalFat)) * 100;
     const ratioGlucides = (totalCarbs / (totalProtein + totalCarbs + totalFat)) * 100;
-    
+
     if (ratioProteines < 15) {
       return {
         titre: "Augmentez les protéines !",
@@ -453,7 +613,7 @@ export default function Nutrition() {
         tags: ["🥩 Protéines", "💪 Musculation", "🏋️ Renforcement"]
       };
     }
-    
+
     if (ratioGlucides > 60) {
       return {
         titre: "Parfait pour l'endurance !",
@@ -462,7 +622,7 @@ export default function Nutrition() {
         tags: ["🍞 Glucides", "🏃‍♀️ Endurance", "🚴 Cardio"]
       };
     }
-    
+
     return {
       titre: "Équilibre parfait !",
       conseil: "Votre alimentation et votre activité sont parfaitement équilibrées. Continuez sur cette lancée !",
@@ -513,18 +673,7 @@ export default function Nutrition() {
               <p className="text-white/80 mt-2 text-base">Créez votre profil nutritionnel personnalisé</p>
             </div>
          {/* formulaire   */}
-         <form className="space-y-5 bg-black/90 rounded-2xl shadow-lg p-6 mx-4 mb-8" onSubmit={e => {
-              e.preventDefault();
-              setProfile({
-                weight: Number(e.target.weight.value),
-                height: Number(e.target.height.value),
-                age: Number(e.target.age.value),
-                sex: e.target.sex.value,
-                activity: e.target.activity.value,
-                goal: e.target.goal.value,
-              });
-              setShowProfileModal(false);
-            }}>
+         <form className="space-y-5 bg-black/90 rounded-2xl shadow-lg p-6 mx-4 mb-8" onSubmit={handleProfileSubmit}>
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold mb-1 text-gray-500">Âge</label>
@@ -815,7 +964,7 @@ export default function Nutrition() {
               <span>Hydratation</span>
             </h3>
             
-            {dayData.water * 250 >= 2000 && (
+            {todayData.water * 250 >= 2000 && (
               <div className="flex items-center justify-center mb-4 animate-bounce">
                 <span className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-400 to-emerald-400 text-white font-bold px-4 py-2 rounded-full shadow-lg border-2 border-blue-300">
                   🏅 Hydration Hero !
@@ -823,7 +972,7 @@ export default function Nutrition() {
               </div>
             )}
             
-            {dayData.water * 250 === 1750 && (
+            {todayData.water * 250 === 1750 && (
               <div className="flex items-center justify-center mb-4 animate-bounce">
                 <span className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-400 to-emerald-400 text-white font-bold px-4 py-2 rounded-full shadow-lg border-2 border-blue-300">
                   Encore 250ml pour atteindre ton objectif !
@@ -833,27 +982,27 @@ export default function Nutrition() {
             
             <div className="flex justify-between items-center mb-5">
               <span className="text-sm font-medium text-gray-600">Objectif quotidien</span>
-              <span className="text-blue-500 font-bold">{dayData.water * 250}ml / 2000ml</span>
+              <span className="text-blue-500 font-bold">{todayData.water * 250}ml / 2000ml</span>
             </div>
             
             <div className="flex flex-row gap-3 justify-center items-center">
               {[...Array(8)].map((_, i) => (
                 <button
                   key={i}
-                  onClick={() => i < dayData.water ? handleRemoveWater() : handleAddWater()}
+                  onClick={() => i < todayData.water ? handleRemoveWater() : handleAddWater()}
                   className={`h-16 w-12 rounded-xl transition-all flex items-end justify-center relative overflow-hidden ${
-                    i < dayData.water 
+                    i < todayData.water 
                       ? 'bg-gradient-to-b from-blue-200 to-blue-400 shadow-inner'
                       : 'bg-gray-100 hover:bg-blue-50'
                   }`}
                 >
-                  <div className={`absolute bottom-0 w-full ${i < dayData.water ? 'bg-blue-300/50' : 'bg-gray-200'} transition-all`} 
+                  <div className={`absolute bottom-0 w-full ${i < todayData.water ? 'bg-blue-300/50' : 'bg-gray-200'} transition-all`} 
                        style={{ height: `${(i+1)*12.5}%` }}>
                   </div>
                   <span className={`text-2xl mb-2 z-10 ${
-                    i < dayData.water ? 'text-blue-600 animate-bounce' : 'text-gray-400'
+                    i < todayData.water ? 'text-blue-600 animate-bounce' : 'text-gray-400'
                   }`}>
-                    {i < dayData.water ? '💧' : '+'}
+                    {i < todayData.water ? '💧' : '+'}
                   </span>
                 </button>
               ))}
@@ -886,12 +1035,12 @@ export default function Nutrition() {
                       </div>
 
                       <div className="mt-4 space-y-3">
-                        {dayData.meals[meal.id].length === 0 ? (
+                        {todayData.meals[meal.id].length === 0 ? (
                           <div className="text-center py-4 text-gray-400 text-sm bg-white/50 rounded-lg border border-dashed border-gray-300">
                             Cliquez sur "+ Ajouter un aliment" pour commencer
                           </div>
                         ) : (
-                          dayData.meals[meal.id].map((food, idx) => (
+                          todayData.meals[meal.id].map((food, idx) => (
                             editing && editing.meal === meal.id && editing.idx === idx ? (
                               <EditFoodForm
                                 key={idx}
@@ -1056,7 +1205,13 @@ export default function Nutrition() {
                     </button>
                     <button
                       type="button"
-                      onClick={handleReset}
+                      onClick={() => {
+                        localStorage.removeItem("nutritionProfile");
+                        localStorage.removeItem("nutritionData");
+                        setProfile(null);
+                        setTodayData({ meals: { breakfast: [], lunch: [], dinner: [], snack: [] }, water: 0 });
+                        setShowProfileModal(false);
+                      }}
                       className="flex-1 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-800"
                     >
                       Réinitialiser
@@ -1109,6 +1264,22 @@ export default function Nutrition() {
 </div>
 
       </div>
+
+      {/* Notifications */}
+      {(error || success) && (
+        <div className="fixed bottom-4 right-4 z-50">
+          {error && (
+            <div className="bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg mb-2">
+              {error}
+            </div>
+          )}
+          {success && (
+            <div className="bg-emerald-500 text-white px-4 py-2 rounded-lg shadow-lg">
+              {success}
+            </div>
+          )}
+        </div>
+      )}
     </>
   );
 }

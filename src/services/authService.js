@@ -1,12 +1,25 @@
 import api from "../api";
 
 export const register = async (userData) => {
-  return api.post("/auth/register", userData); // ajuste si route est /users/register
+  const response = await api.post("/auth/register", userData);
+  if (response.data.success) {
+    localStorage.setItem("token", response.data.token);
+    localStorage.setItem("userId", response.data.user.id); // ou response.data.user._id si nécessaire
+  }
+  return response;
 };
 
 export const login = async (credentials) => {
   const response = await api.post("/auth/login", credentials);
-  localStorage.setItem("userId", response.data.userId); // sauvegarde userId
-  localStorage.setItem("token", response.data.token); // si JWT
+  if (response.data.success) {
+    localStorage.setItem("token", response.data.token);
+    localStorage.setItem("userId", response.data.user.id || response.data.user._id); // Gérer id ou _id
+  }
   return response;
+};
+
+export const logout = async () => {
+  await api.post("/auth/logout");
+  localStorage.removeItem("token");
+  localStorage.removeItem("userId");
 };
